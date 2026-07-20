@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"time"
 
 	appconfig "BuckStream/pkg/config"
@@ -32,6 +33,11 @@ func NewS3Provider(ctx context.Context, cfg *appconfig.Config) (*S3Provider, err
 			return nil, fmt.Errorf("failed to initialize AWS S3 via IAM: %w", err)
 		}
 	} else if cfg.S3CompatibleByToken {
+		// Auto-spin local Garage container if set to localhost in non-serverless environments
+		if err := AutoSpinGarage(ctx, cfg.S3CompatibleEndpoint, cfg.S3CompatibleAccessKey, cfg.S3CompatibleAccessSecret); err != nil {
+			log.Printf("⚠️ Local S3 container auto-spin warning: %v. Continuing...", err)
+		}
+
 		s3Client, err = InitS3CompatibleWithToken(
 			ctx,
 			cfg.S3CompatibleEndpoint,

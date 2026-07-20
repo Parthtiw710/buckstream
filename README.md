@@ -74,6 +74,10 @@ Copy `env.example` to `.env` or set these in your hosting environment:
 
 ## ⚡ Quick Start
 
+> [!TIP]
+> **Zero-Setup Local S3 Storage**
+> If you have a local Docker daemon running, you do not need to set up or configure an external cloud S3 bucket for local testing. BuckStream will automatically detect Docker, spin up a lightweight local **Garage S3** container, auto-configure the S3 credentials, and store all data locally on your disk.
+
 ### 1. Build and Run from Source
 ```bash
 # Clone the repository
@@ -111,10 +115,19 @@ Once BuckStream is running, open your browser and navigate to `http://localhost:
 
 ### 4. Running the Demo Playground
 The `demo/` folder contains a Vite-based React client playground used to test and check your static site deployments and file uploads. To start it:
+
+**Using npm:**
 ```bash
 cd demo
 npm install
 npm run dev
+```
+
+**Using Bun:**
+```bash
+cd demo
+bun install
+bun run dev
 ```
 
 ---
@@ -201,6 +214,25 @@ jobs:
 ## 🔌 Client SDKs
 
 ![Client SDKs and Quick Deployment](docs/sdk-examples.png)
+
+### Isomorphic JavaScript SDK (Node.js & Bun)
+
+The client SDK in `sdk/node/buckstream.js` works out of the box in browsers, Node.js (18+), and Bun. It leverages native, standard Web APIs (`fetch`, `Response`, `Blob`) and requires **zero external dependencies**.
+
+```javascript
+import { BuckStreamClient } from "./sdk/node/buckstream.js";
+
+// Initialize client
+const client = new BuckStreamClient("http://localhost:8080", "your_upload_token");
+
+// Upload a file (accepts File, Blob, ArrayBuffer, or Buffer)
+const result = await client.Upload(fileContent, "uploads/image.png", "image/png");
+console.log("Upload result:", result);
+
+// List uploaded files
+const listResult = await client.List();
+console.log("Files:", listResult.objects);
+```
 
 ## 📄 License
 

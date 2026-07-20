@@ -1,6 +1,8 @@
 # Go binaries and build files
 bin/
 tmp/
+buckstream
+buckstream_stripped
 *.exe
 *.dll
 *.so

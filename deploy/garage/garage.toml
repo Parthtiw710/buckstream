@@ -1,0 +1,19 @@
+# S3-compatible Garage Configuration for Buckstream Local Deployment
+
+metadata_dir = "/data/meta"
+data_dir = "/data/blobs"
+db_engine = "sqlite"
+
+# Single-node configuration (required by Garage even without clustering)
+replication_mode = "none"
+rpc_bind_addr = "[::]:3901"
+rpc_public_addr = "127.0.0.1:3901"
+rpc_secret = "0000000000000000000000000000000000000000000000000000000000000000"
+
+[s3_api]
+api_bind_addr = "[::]:3900"
+s3_region = "us-east-1"
+
+[admin]
+admin_bind_addr = "[::]:3903"
+admin_token = "myminioadminsecrettoken123"

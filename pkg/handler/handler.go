@@ -32,18 +32,28 @@ type Handler struct {
 	cfg      *config.Config
 	provider storage.StorageProvider
 	bucket   string
-	cache    map[string]map[string]cachedFile
-	cacheMu  sync.RWMutex
+	cache    *LRUCache
+	loadMu   sync.Mutex // Serializes S3/GCS downloads on cache misses
 }
 
 // NewHandler creates a new Handler instance with an initialized cache.
 func NewHandler(cfg *config.Config, provider storage.StorageProvider, bucket string) *Handler {
-	return &Handler{
+	h := &Handler{
 		cfg:      cfg,
 		provider: provider,
 		bucket:   bucket,
-		cache:    make(map[string]map[string]cachedFile),
+		cache:    NewLRUCache(cfg.MaxCachedSites),
 	}
+
+	// Start background cache cleaner/janitor (sweeps every 5 minutes, evicts inactive sites after 1 hour)
+	go func() {
+		ticker := time.NewTicker(5 * time.Minute)
+		for range ticker.C {
+			h.cache.EvictExpired(1 * time.Hour)
+		}
+	}()
+
+	return h
 }
 
 // IsSubdomain checks if a hostName is a subdomain request relative to the configured root domain.
@@ -115,18 +125,15 @@ func writeJSONError(w http.ResponseWriter, message string, status int) {
 
 // loadSiteCache downloads the site ZIP from the bucket, unzips it in memory, and caches it.
 func (h *Handler) loadSiteCache(ctx context.Context, siteName string) (map[string]cachedFile, error) {
-	h.cacheMu.RLock()
-	siteCache, exists := h.cache[siteName]
-	h.cacheMu.RUnlock()
-	if exists {
+	if siteCache, exists := h.cache.Get(siteName); exists {
 		return siteCache, nil
 	}
 
-	h.cacheMu.Lock()
-	defer h.cacheMu.Unlock()
+	h.loadMu.Lock()
+	defer h.loadMu.Unlock()
 
 	// Double-check after acquiring write lock
-	if siteCache, exists = h.cache[siteName]; exists {
+	if siteCache, exists := h.cache.Get(siteName); exists {
 		return siteCache, nil
 	}
 
@@ -190,7 +197,7 @@ func (h *Handler) loadSiteCache(ctx context.Context, siteName string) (map[strin
 		}
 	}
 
-	h.cache[siteName] = newSiteCache
+	h.cache.Put(siteName, newSiteCache)
 	log.Printf("✅ [Cache] Successfully loaded and cached %d files for site: %s", len(newSiteCache), siteName)
 	return newSiteCache, nil
 }
@@ -409,9 +416,7 @@ func (h *Handler) HandleProxyOrStatic(w http.ResponseWriter, r *http.Request) {
 
 // ClearSiteCache invalidates the RAM cache for a given site.
 func (h *Handler) ClearSiteCache(siteName string) {
-	h.cacheMu.Lock()
-	delete(h.cache, siteName)
-	h.cacheMu.Unlock()
+	h.cache.Delete(siteName)
 	log.Printf("🧹 [Cache] Invalidated cache for site: %s", siteName)
 }
 

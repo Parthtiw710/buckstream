@@ -21,6 +21,7 @@ type Config struct {
 	BucketName               string
 	DeployToken              string
 	UploadToken              string
+	MaxCachedSites           int
 }
 
 func LoadConfig() *Config {
@@ -41,6 +42,7 @@ func LoadConfig() *Config {
 		BucketName:               os.Getenv("BUCKET_NAME"),
 		DeployToken:              os.Getenv("DEPLOY_TOKEN"),
 		UploadToken:              os.Getenv("UPLOAD_TOKEN"),
+		MaxCachedSites:           parseIntEnv("MAX_CACHED_SITES", 10),
 	}
 }
 
@@ -54,6 +56,18 @@ func parseBoolEnv(key string, fallback bool) bool {
 		return fallback
 	}
 	return b
+}
+
+func parseIntEnv(key string, fallback int) int {
+	val := os.Getenv(key)
+	if val == "" {
+		return fallback
+	}
+	i, err := strconv.Atoi(val)
+	if err != nil {
+		return fallback
+	}
+	return i
 }
 
 func getEnv(key, fallback string) string {

@@ -5,7 +5,11 @@ import (
 	"embed"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
+	"time"
 
 	"BuckStream/pkg/config"
 	"BuckStream/pkg/handler"
@@ -88,9 +92,33 @@ func main() {
 		w.Write(indexContent)
 	})
 
-	// 5. Start HTTP Server
-	log.Println("🚀 BuckStream storage broker listening on :8080...")
-	if err := http.ListenAndServe(":8080", nil); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
+	// 5. Start HTTP Server with Graceful Shutdown
+	srv := &http.Server{
+		Addr:    ":8080",
+		Handler: nil, // Uses http.DefaultServeMux
 	}
+
+	go func() {
+		log.Println("🚀 BuckStream storage broker listening on :8080...")
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Failed to start server: %v", err)
+		}
+	}()
+
+	// Wait for interrupt signal to gracefully shut down the server
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	<-quit
+
+	log.Println("⚠️ Shutting down BuckStream storage broker gracefully...")
+
+	// 15 seconds shutdown timeout context
+	ctxShutdown, cancelShutdown := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancelShutdown()
+
+	if err := srv.Shutdown(ctxShutdown); err != nil {
+		log.Fatalf("❌ Server forced to shutdown: %v", err)
+	}
+
+	log.Println("✅ BuckStream storage broker exited cleanly.")
 }
